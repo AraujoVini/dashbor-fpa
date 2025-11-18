@@ -20,8 +20,8 @@ def carregar_dados(arquivo):
     return df_resumo, df_receitas, df_despesas, df_fluxo, df_indicadores
 
 def gerar_kpis(df_resumo, df_fluxo, df_indicadores, mes_selecionado):
-    receita_total = df_resumo.loc[df_resumo['Ms'] == mes_selecionado, 'Receita Total'].values[0]
-    idx_mes = df_resumo.index[df_resumo['Ms'] == mes_selecionado][0]
+    receita_total = df_resumo.loc[df_resumo['Mês'] == mes_selecionado, 'Receita Total'].values[0]
+    idx_mes = df_resumo.index[df_resumo['Mês'] == mes_selecionado][0]
     # Crescimento MoM
     if idx_mes == 0:
         crescimento_mom = 0
@@ -31,25 +31,25 @@ def gerar_kpis(df_resumo, df_fluxo, df_indicadores, mes_selecionado):
     # Margem líquida média
     margem_liquida_media = df_resumo['Margem Lquida'].mean()
     # Saldo de caixa acumulado
-    saldo_caixa = df_fluxo.loc[df_fluxo['Ms'] == mes_selecionado, 'Saldo Acumulado'].values[0]
+    saldo_caixa = df_fluxo.loc[df_fluxo['Mês'] == mes_selecionado, 'Saldo Acumulado'].values[0]
     return receita_total, crescimento_mom, margem_liquida_media, saldo_caixa
 
 def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_selecionados):
     # Gráfico de linha — Receita total por mês
-    fig_receita_linha = px.line(df_resumo, x="Ms", y="Receita Total", markers=True,
+    fig_receita_linha = px.line(df_resumo, x="Mês", y="Receita Total", markers=True,
                                 title="Receita Total por Mês")
     # Gráfico de barras empilhadas — Receita por segmento
-    df_receitas_segmentos = df_receitas[["Ms"] + segmentos_selecionados]
+    df_receitas_segmentos = df_receitas[["Mês"] + segmentos_selecionados]
     fig_receita_segmento = px.bar(
-        df_receitas_segmentos, x="Ms", y=segmentos_selecionados,
+        df_receitas_segmentos, x="Mês", y=segmentos_selecionados,
         title="Receita por Segmento", labels={'value': 'Receita', 'variable': 'Segmento'},
         barmode='stack'
     )
     # Gráfico waterfall — DRE simplificada
     valores_waterfall = [
-        df_resumo.loc[df_resumo['Ms'] == mes_selecionado, 'Receita Total'].values[0],
-        -df_resumo.loc[df_resumo['Ms'] == mes_selecionado, 'Custo dos Servios CS'].values[0],
-        -df_resumo.loc[df_resumo['Ms'] == mes_selecionado, 'Despesas Operacionais'].values[0]
+        df_resumo.loc[df_resumo['Mês'] == mes_selecionado, 'Receita Total'].values[0],
+        -df_resumo.loc[df_resumo['Mês'] == mes_selecionado, 'Custo dos Servios CS'].values[0],
+        -df_resumo.loc[df_resumo['Mês'] == mes_selecionado, 'Despesas Operacionais'].values[0]
     ]
     texto_waterfall = ['Receita Total', 'Custos dos Serviços', 'Despesas Operacionais']
     waterfall = go.Figure(go.Waterfall(
@@ -65,13 +65,13 @@ def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_
     # Gráfico combinado: Entradas/Saídas/Saldo
     fig_fluxo = go.Figure()
     fig_fluxo.add_trace(go.Bar(
-        x=df_fluxo['Ms'], y=df_fluxo['Entradas'], name='Entradas', marker_color='rgb(24,149,202)'
+        x=df_fluxo['Mês'], y=df_fluxo['Entradas'], name='Entradas', marker_color='rgb(24,149,202)'
     ))
     fig_fluxo.add_trace(go.Bar(
-        x=df_fluxo['Ms'], y=df_fluxo['Sadas'], name='Saídas', marker_color='rgb(255,110,110)'
+        x=df_fluxo['Mês'], y=df_fluxo['Sadas'], name='Saídas', marker_color='rgb(255,110,110)'
     ))
     fig_fluxo.add_trace(go.Scatter(
-        x=df_fluxo['Ms'], y=df_fluxo['Saldo Acumulado'], name='Saldo Acumulado',
+        x=df_fluxo['Mês'], y=df_fluxo['Saldo Acumulado'], name='Saldo Acumulado',
         mode='lines+markers', marker_color='rgb(51,170,51)'
     ))
     fig_fluxo.update_layout(barmode='group', title="Fluxo de Caixa — Entradas, Saídas e Saldo")
@@ -90,7 +90,7 @@ if arquivo is None:
     arquivo = "Planilha_FP&A_Fake.xlsx"
 df_resumo, df_receitas, df_despesas, df_fluxo, df_indicadores = carregar_dados(arquivo)
 
-meses = df_resumo['Ms'].tolist()
+meses = df_resumo['Mês'].tolist()
 segmentos = ['Consultoria PJ', 'Consultoria PF', 'Treinamentos', 'Projetos Especiais']
 mes_selecionado = st.sidebar.selectbox("Mês de análise:", meses, index=len(meses)-1)
 segmentos_selecionados = st.sidebar.multiselect("Segmentos de receita:", segmentos, default=segmentos)
@@ -119,7 +119,7 @@ st.plotly_chart(fig_fluxo, use_container_width=True)
 # Tabela final: Resumo Financeiro filtrado + download
 # =========================
 st.subheader("Resumo Financeiro — dados filtrados")
-df_filtro = df_resumo[df_resumo["Ms"] == mes_selecionado]
+df_filtro = df_resumo[df_resumo["Mês"] == mes_selecionado]
 st.dataframe(df_filtro)
 
 def baixar_excel(df):
@@ -134,3 +134,4 @@ st.download_button(
 
 # Código comentado para facilitar manutenção e extensões.
 # Requisitos extras: layout clean, cores suaves, cards de métricas, filtros, upload e download. [file:1]
+
