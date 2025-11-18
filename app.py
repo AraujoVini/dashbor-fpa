@@ -32,39 +32,49 @@ def carregar_dados(arquivo):
     
     return df_resumo, df_receitas, df_despesas, df_fluxo, df_indicadores
 
-def gerar_kpis(df_resumo, df_fluxo, df_indicadores, mes_selecionado):
+def gerar_kpis(df_resumo, df_fluxo, df_indicadores, mes_selecionado, coluna_mes_resumo, coluna_mes_fluxo):
     """Gera os KPIs principais do dashboard"""
     try:
         # Receita Total
-        receita_total = df_resumo.loc[df_resumo['Ms'] == mes_selecionado, 'Receita Total'].values[0]
+        receita_total = df_resumo.loc[df_resumo[coluna_mes_resumo] == mes_selecionado, 'Receita Total'].values[0]
         
         # Crescimento MoM
-        idx_mes = df_resumo.index[df_resumo['Ms'] == mes_selecionado][0]
+        idx_mes = df_resumo.index[df_resumo[coluna_mes_resumo] == mes_selecionado][0]
         if idx_mes == 0:
             crescimento_mom = 0
         else:
             receita_anterior = df_resumo.loc[idx_mes - 1, 'Receita Total']
             crescimento_mom = ((receita_total - receita_anterior) / receita_anterior) * 100
         
-        # Margem Líquida Média
-        margem_liquida_media = df_resumo['Margem Lquida'].mean()
+        # Margem Líquida Média - tenta várias possibilidades de nome
+        margem_col = None
+        for col in df_resumo.columns:
+            if 'margem' in col.lower() and 'liquida' in col.lower():
+                margem_col = col
+                break
+        
+        if margem_col:
+            margem_liquida_media = df_resumo[margem_col].mean()
+        else:
+            margem_liquida_media = 0
         
         # Saldo de Caixa
-        saldo_caixa = df_fluxo.loc[df_fluxo['Ms'] == mes_selecionado, 'Saldo Acumulado'].values[0]
+        saldo_caixa = df_fluxo.loc[df_fluxo[coluna_mes_fluxo] == mes_selecionado, 'Saldo Acumulado'].values[0]
         
         return receita_total, crescimento_mom, margem_liquida_media, saldo_caixa
     
     except Exception as e:
         st.error(f"Erro ao calcular KPIs: {e}")
+        st.write("DataFrame Resumo:", df_resumo.head())
         return 0, 0, 0, 0
 
-def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_selecionados):
+def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_selecionados, coluna_mes_resumo, coluna_mes_receitas, coluna_mes_fluxo):
     """Gera os gráficos do dashboard"""
     
     # 1. Gráfico de Linha - Evolução da Receita
     fig_receita_linha = px.line(
         df_resumo, 
-        x='Ms', 
+        x=coluna_mes_resumo, 
         y='Receita Total',
         title='Evolução da Receita Total',
         markers=True
@@ -83,7 +93,7 @@ def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_
     
     fig_receita_segmento = px.bar(
         df_receitas_filtrado,
-        x='Ms',
+        x=coluna_mes_receitas,
         y='Valor',
         color='Segmento',
         title='Receitas por Segmento',
@@ -93,7 +103,7 @@ def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_
     # 3. Gráfico de Fluxo de Caixa
     fig_fluxo = go.Figure()
     fig_fluxo.add_trace(go.Scatter(
-        x=df_fluxo['Ms'], 
+        x=df_fluxo[coluna_mes_fluxo], 
         y=df_fluxo['Saldo Acumulado'],
         mode='lines+markers',
         name='Saldo Acumulado',
@@ -126,7 +136,7 @@ if arquivo_upload is not None:
         # Carrega os dados
         df_resumo, df_receitas, df_despesas, df_fluxo, df_indicadores = carregar_dados(arquivo_upload)
         
-        # Debug: Mostra as colunas carregadas
+        # Debug: Mostra as colunas carregadas E IDENTIFICA O NOME CORRETO DA COLUNA DE MÊS
         with st.expander("🔍 Ver colunas carregadas"):
             st.write("**Resumo Financeiro:**", list(df_resumo.columns))
             st.write("**Receitas:**", list(df_receitas.columns))
@@ -134,13 +144,46 @@ if arquivo_upload is not None:
             st.write("**Fluxo de Caixa:**", list(df_fluxo.columns))
             st.write("**Indicadores:**", list(df_indicadores.columns))
         
+        # Identifica automaticamente a coluna de mês
+        possíveis_nomes_mes = ['Ms', 'Mês', 'Mes', 'mês', 'mes', 'MÊS', 'MES', 'Month', 'Data', 'Período']
+        coluna_mes_resumo = None
+        coluna_mes_receitas = None
+        coluna_mes_fluxo = None
+        
+        for col in df_resumo.columns:
+            if col in possíveis_nomes_mes or 'mes' in col.lower() or 'mês' in col.lower():
+                coluna_mes_resumo = col
+                break
+        
+        for col in df_receitas.columns:
+            if col in possíveis_nomes_mes or 'mes' in col.lower() or 'mês' in col.lower():
+                coluna_mes_receitas = col
+                break
+                
+        for col in df_fluxo.columns:
+            if col in possíveis_nomes_mes or 'mes' in col.lower() or 'mês' in col.lower():
+                coluna_mes_fluxo = col
+                break
+        
+        if not coluna_mes_resumo:
+            st.error("❌ Coluna de mês não encontrada na aba 'Resumo Financeiro'. Colunas disponíveis: " + str(list(df_resumo.columns)))
+            st.stop()
+        
+        if not coluna_mes_receitas:
+            st.error("❌ Coluna de mês não encontrada na aba 'Receitas'. Colunas disponíveis: " + str(list(df_receitas.columns)))
+            st.stop()
+            
+        if not coluna_mes_fluxo:
+            st.error("❌ Coluna de mês não encontrada na aba 'Fluxo de Caixa'. Colunas disponíveis: " + str(list(df_fluxo.columns)))
+            st.stop()
+        
         # Filtros na Sidebar
         with st.sidebar:
             st.markdown("---")
             st.subheader("Filtros")
             
             # Filtro de Mês
-            meses_disponiveis = df_resumo['Ms'].unique().tolist()
+            meses_disponiveis = df_resumo[coluna_mes_resumo].unique().tolist()
             mes_selecionado = st.selectbox("Selecione o Mês", meses_disponiveis)
             
             # Filtro de Segmento
@@ -156,7 +199,7 @@ if arquivo_upload is not None:
         
         # Gera KPIs
         receita_total, crescimento_mom, margem_liquida_media, saldo_caixa = gerar_kpis(
-            df_resumo, df_fluxo, df_indicadores, mes_selecionado
+            df_resumo, df_fluxo, df_indicadores, mes_selecionado, coluna_mes_resumo, coluna_mes_fluxo
         )
         
         # Exibe KPIs
@@ -180,7 +223,8 @@ if arquivo_upload is not None:
         
         # Gera e exibe gráficos
         fig_receita_linha, fig_receita_segmento, fig_fluxo = gerar_graficos(
-            df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_selecionados
+            df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_selecionados,
+            coluna_mes_resumo, coluna_mes_receitas, coluna_mes_fluxo
         )
         
         # Layout dos gráficos
