@@ -71,49 +71,92 @@ def gerar_kpis(df_resumo, df_fluxo, df_indicadores, mes_selecionado, coluna_mes_
 def gerar_graficos(df_resumo, df_receitas, df_fluxo, mes_selecionado, segmentos_selecionados, coluna_mes_resumo, coluna_mes_receitas, coluna_mes_fluxo):
     """Gera os gráficos do dashboard"""
     
-    # 1. Gráfico de Linha - Evolução da Receita
-    fig_receita_linha = px.line(
-        df_resumo, 
-        x=coluna_mes_resumo, 
-        y='Receita Total',
-        title='Evolução da Receita Total',
-        markers=True
-    )
-    fig_receita_linha.update_layout(
-        xaxis_title="Mês",
-        yaxis_title="Receita (R$)",
-        hovermode='x unified'
-    )
+    try:
+        # 1. Gráfico de Linha - Evolução da Receita
+        fig_receita_linha = px.line(
+            df_resumo, 
+            x=coluna_mes_resumo, 
+            y='Receita Total',
+            title='Evolução da Receita Total',
+            markers=True
+        )
+        fig_receita_linha.update_layout(
+            xaxis_title="Mês",
+            yaxis_title="Receita (R$)",
+            hovermode='x unified'
+        )
+    except Exception as e:
+        st.error(f"Erro no gráfico de receita: {e}")
+        fig_receita_linha = go.Figure()
     
-    # 2. Gráfico de Barras - Receitas por Segmento
-    if segmentos_selecionados:
-        df_receitas_filtrado = df_receitas[df_receitas['Segmento'].isin(segmentos_selecionados)]
-    else:
-        df_receitas_filtrado = df_receitas
+    try:
+        # 2. Gráfico de Barras - Receitas por Segmento
+        # Detecta coluna de valor
+        coluna_valor = None
+        for col in df_receitas.columns:
+            if 'valor' in col.lower() or col in ['Consultoria PJ', 'Consultoria PI', 'Treinamentos', 'Projetos Especiais', 'Receita Total']:
+                coluna_valor = col
+                break
+        
+        if not coluna_valor:
+            # Se não encontrar, pega a primeira coluna numérica que não é o mês
+            colunas_numericas = df_receitas.select_dtypes(include=['float64', 'int64']).columns
+            colunas_numericas = [c for c in colunas_numericas if c != coluna_mes_receitas]
+            if len(colunas_numericas) > 0:
+                coluna_valor = colunas_numericas[0]
+        
+        if coluna_valor and 'Segmento' in df_receitas.columns:
+            if segmentos_selecionados:
+                df_receitas_filtrado = df_receitas[df_receitas['Segmento'].isin(segmentos_selecionados)]
+            else:
+                df_receitas_filtrado = df_receitas
+            
+            fig_receita_segmento = px.bar(
+                df_receitas_filtrado,
+                x=coluna_mes_receitas,
+                y=coluna_valor,
+                color='Segmento',
+                title='Receitas por Segmento',
+                barmode='group'
+            )
+        else:
+            # Plano B: gráfico com todas as colunas numéricas
+            colunas_numericas = [col for col in df_receitas.columns if col != coluna_mes_receitas and df_receitas[col].dtype in ['float64', 'int64']]
+            if colunas_numericas:
+                fig_receita_segmento = px.bar(
+                    df_receitas,
+                    x=coluna_mes_receitas,
+                    y=colunas_numericas,
+                    title='Receitas Detalhadas',
+                    barmode='group'
+                )
+            else:
+                fig_receita_segmento = go.Figure()
+                st.warning("Não foi possível gerar o gráfico de receitas por segmento. Verifique as colunas da aba 'Receitas'.")
     
-    fig_receita_segmento = px.bar(
-        df_receitas_filtrado,
-        x=coluna_mes_receitas,
-        y='Valor',
-        color='Segmento',
-        title='Receitas por Segmento',
-        barmode='group'
-    )
+    except Exception as e:
+        st.error(f"Erro no gráfico de receitas por segmento: {e}")
+        st.write("Colunas disponíveis:", list(df_receitas.columns))
+        fig_receita_segmento = go.Figure()
     
-    # 3. Gráfico de Fluxo de Caixa
-    fig_fluxo = go.Figure()
-    fig_fluxo.add_trace(go.Scatter(
-        x=df_fluxo[coluna_mes_fluxo], 
-        y=df_fluxo['Saldo Acumulado'],
-        mode='lines+markers',
-        name='Saldo Acumulado',
-        line=dict(color='green', width=3)
-    ))
-    fig_fluxo.update_layout(
-        title='Fluxo de Caixa Acumulado',
-        xaxis_title='Mês',
-        yaxis_title='Saldo (R$)'
-    )
+    try:
+        # 3. Gráfico de Fluxo de Caixa
+        fig_fluxo = go.Figure()
+        fig_fluxo.add_trace(go.Scatter(
+            x=df_fluxo[coluna_mes_fluxo], 
+            y=df_fluxo['Saldo Acumulado'],
+            mode='lines+markers',
+            name='Saldo Acumulado',
+            line=dict(color='green', width=3)
+        ))
+        fig_fluxo.update_layout(
+            title='Fluxo de Caixa Acumulado',
+            xaxis_title='Mês',
+            yaxis_title='Saldo (R$)'
+        )
+    except Exception as e:
+        st.error(f"Erro no gráfico de fluxo de caixa: {e}")
+        fig_fluxo = go.Figure()
     
     return fig_receita_linha, fig_receita_segmento, fig_fluxo
 
