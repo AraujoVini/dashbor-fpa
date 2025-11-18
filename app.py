@@ -17,9 +17,4 @@ def carregar_dados(arquivo):
 
 def gerar_kpis(df_resumo, df_fluxo, df_indicadores, mes_selecionado):
     receita_total = df_resumo.loc[df_resumo['Ms'] == mes_selecionado, 'Receita Total'].values[0]
-    idx_mes = df_resumo.index[df_resumo['Ms'] == mes_selecionado][0]
-    if idx_mes == 0:
-        crescimento_mom = 0
-    else:
-        receita_anterior = df_resumo.loc[idx_mes - 1, 'Receita Total']
-        crescimento_mom = (receita_total - receita_anterior) / receita_anterior * 100
+    idx_mes = df_resumo.index
